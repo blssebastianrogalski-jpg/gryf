@@ -298,7 +298,7 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
       <div class="panel stack">
         <div class="row" style="justify-content:space-between">
           <div><h2 id="sTitle">Piosenka</h2><div class="hint" id="sArtist"></div></div>
-          <div class="row"><button class="btn small" id="sListen">▶ Posłuchaj chwytu</button><button class="btn small danger" id="sDel" hidden>Usuń</button></div>
+          <div class="row"><button class="btn small" id="sListen">▶ Posłuchaj chwytu</button><button class="btn small" id="sEdit" hidden>Popraw chwyty</button><button class="btn small danger" id="sDel" hidden>Usuń</button></div>
         </div>
         <div class="target">
           <div id="sDiagram"></div>
@@ -344,8 +344,8 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
         <div class="label">Piosenki</div>
         <input type="search" id="sSearch" placeholder="Szukaj na liście po tytule lub wykonawcy">
         <div class="list" id="sList"></div>
-        <details>
-          <summary>Dodaj piosenkę (wklej chwyty)</summary>
+        <details id="sAdd">
+          <summary id="sAddSum">Dodaj piosenkę (wklej chwyty)</summary>
           <div class="stack" style="margin-top:10px">
             <div class="row">
               <div class="field"><span class="label">Tytuł</span><input type="text" id="sNewTitle"></div>
@@ -907,7 +907,7 @@ VIEWS.record = (()=>{
 
 /* ---------- SONGS ---------- */
 const SONGS = VIEWS.songs = (()=>{
-  let sel=null, steps=[], idx=0, results=[], running=false, mode='wait', pat=PATTERNS.basic, t0=0, slotDur=0.4, barDur=3.2, hits=[], okFrames=0, totFrames=0, onsetSinceStep=false, okSince=0, lastBar=-1, schedNext=0, schedTimer=null, rhythmLog=[], lastHint=0;
+  let editing=null, sel=null, steps=[], idx=0, results=[], running=false, mode='wait', pat=PATTERNS.basic, t0=0, slotDur=0.4, barDur=3.2, hits=[], okFrames=0, totFrames=0, onsetSinceStep=false, okSince=0, lastBar=-1, schedNext=0, schedTimer=null, rhythmLog=[], lastHint=0;
   function all(){ return [...BUILTIN_SONGS, ...store.get('songs',[])]; }
   function refresh(){
     const q=$('#sSearch').value.trim().toLowerCase(), box=$('#sList'); box.innerHTML='';
@@ -917,7 +917,7 @@ const SONGS = VIEWS.songs = (()=>{
     });
     if(!box.children.length) box.append(el('p',{class:'hint'},'Nie znalazłem tej piosenki. Wklej jej chwyty w „Dodaj piosenkę” poniżej, a aplikacja zrobi z nich ćwiczenie.'));
   }
-  function select(s){ stop(); sel=s; $('#sDel').hidden=BUILTIN_SONGS.includes(s); $('#sDel').dataset.armed=''; $('#sDel').textContent='Usuń'; steps=parseSong(s.text); pat=PATTERNS[s.pat]||PATTERNS.basic; $('#sBpm').value=s.bpm||70; $('#sTitle').textContent=s.title; $('#sArtist').textContent=s.artist||''; store.set('lastSong',s.id); idx=0; results=steps.map(()=>null); hits=[]; refresh(); draw(); fb('', s.tips? s.tips+' Naciśnij Start.' : steps.length?'Naciśnij Start. W trybie „Czeka na mnie” aplikacja przejdzie dalej, gdy usłyszy dobry chwyt.':'Nie znalazłem chwytów w tym tekście.'); }
+  function select(s){ stop(); sel=s; $('#sDel').hidden=BUILTIN_SONGS.includes(s); $('#sEdit').hidden=BUILTIN_SONGS.includes(s); editing=null; $('#sAddSum').textContent='Dodaj piosenkę (wklej chwyty)'; $('#sDel').dataset.armed=''; $('#sDel').textContent='Usuń'; steps=parseSong(s.text); pat=PATTERNS[s.pat]||PATTERNS.basic; $('#sBpm').value=s.bpm||70; $('#sTitle').textContent=s.title; $('#sArtist').textContent=s.artist||''; store.set('lastSong',s.id); idx=0; results=steps.map(()=>null); hits=[]; refresh(); draw(); fb('', s.tips? s.tips+' Naciśnij Start.' : steps.length?'Naciśnij Start. W trybie „Czeka na mnie” aplikacja przejdzie dalej, gdy usłyszy dobry chwyt.':'Nie znalazłem chwytów w tym tekście.'); }
   function fb(kind,text){ $('#sFb').className='fb'+(kind?' '+kind:''); $('#sFbText').textContent=text; }
   function draw(){
     const c=steps[idx];
@@ -989,6 +989,7 @@ const SONGS = VIEWS.songs = (()=>{
   function init(){
     const ps=$('#sNewPat'); Object.entries(PATTERNS).forEach(([k,p])=>ps.append(el('option',{value:k},p.name))); ps.value='basic';
     $('#sSearch').addEventListener('input',refresh);
+    $('#sEdit').onclick=()=>{ editing=sel; $('#sAdd').open=true; $('#sAddSum').textContent='Popraw: '+sel.title; $('#sNewTitle').value=sel.title; $('#sNewArtist').value=sel.artist||''; $('#sNewText').value=sel.text; $('#sNewPat').value=sel.pat||'basic'; $('#sNewBpm').value=sel.bpm||70; $('#sNewText').focus(); };
     $('#sDel').onclick=()=>{ const d=$('#sDel'); if(d.dataset.armed!=='1'){ d.dataset.armed='1'; d.textContent='Na pewno usunąć?'; return; } store.set('songs',store.get('songs',[]).filter(x=>x.id!==sel.id)); select(BUILTIN_SONGS[0]); };
     $('#sStart').onclick=start; $('#sStop').onclick=()=>{ stop(); fb('','Zatrzymano.'); draw(); };
     $('#sModeWait').onclick=()=>{ mode='wait'; $('#sModeWait').setAttribute('aria-pressed','true'); $('#sModeMetro').setAttribute('aria-pressed','false'); stop(); draw(); };
@@ -996,8 +997,8 @@ const SONGS = VIEWS.songs = (()=>{
     $('#sListen').onclick=()=>{ const c=steps[Math.min(idx,steps.length-1)]; if(c) strumChord(c.name,c.pc,c.q); };
     $('#sNewSave').onclick=()=>{ const title=$('#sNewTitle').value.trim(), text=$('#sNewText').value; const st=parseSong(text);
       if(!title||!st.length){ $('#sNewMsg').textContent='Podaj tytuł i wklej tekst, w którym są chwyty (np. C G Am F).'; return; }
-      const s={id:'u'+Date.now(), title, artist:$('#sNewArtist').value.trim(), text, pat:$('#sNewPat').value, bpm:+$('#sNewBpm').value||70};
-      const own=store.get('songs',[]); own.push(s); store.set('songs',own); $('#sNewMsg').textContent=`Zapisano. Znalazłem ${st.length} akordów: ${[...new Set(st.map(x=>x.name))].join(', ')}.`; select(s); };
+      const s={...(editing||{}), id: editing?editing.id:'u'+Date.now(), title, artist:$('#sNewArtist').value.trim(), text, pat:$('#sNewPat').value, bpm:+$('#sNewBpm').value||70};
+      let own=store.get('songs',[]); if(editing) own=own.filter(x=>x.id!==editing.id); own.push(s); store.set('songs',own); $('#sNewMsg').textContent=`Zapisano. Znalazłem ${st.length} akordów: ${[...new Set(st.map(x=>x.name))].join(', ')}.`; select(s); };
     const last=store.get('lastSong','s-emam'); select(all().find(s=>s.id===last)||BUILTIN_SONGS[0]);
   }
   return {init,tick,refresh,selectSong:select};
