@@ -1069,12 +1069,14 @@ Zasady:
 - Graj możliwie w pierwszej pozycji (progi 0-5), żeby było łatwo. Możesz przenieść melodię o oktawę lub do łatwiejszej tonacji.
 - Zapisz 4 do 16 taktów, najpierw najbardziej znany fragment.
 - Nie cytuj tekstu piosenki.
-- Gdy nie jesteś pewien dźwięków, ustaw confidence na niska i napisz to w tips. Gdy nie znasz melodii, ustaw found=false.
+- Jeśli masz wyszukiwarkę, poszukaj tabulatury tego utworu (np. "<tytuł> tab" albo "<tytuł> tabulatura") i oprzyj się na niej, upraszczając do pojedynczych dźwięków.
+- Jeśli kojarzysz utwór, zawsze ustaw found=true i zapisz melodię najlepiej, jak potrafisz, nawet gdy nie jesteś pewien wszystkich dźwięków. Wtedy ustaw confidence na niska i napisz to w tips. Krótki fragment melodii do nauki gry jest w porządku.
+- found=false ustaw tylko wtedy, gdy w ogóle nie kojarzysz utworu. Wtedy w tips napisz krótko, czego brakuje (np. czy chodzi o innego wykonawcę).
 - Wskazówki pisz po polsku, krótko i życzliwie.`;
   function mkfb(id){ return (kind,text)=>{ const f=$('#'+id); f.hidden=false; f.className='fb'+(kind?' '+kind:''); $('#'+id+'Text').textContent=text; }; }
   const fb=mkfb('aiFb'), mfb=mkfb('aimFb');
   function showSettings(on=true){ $('#aiSettings').hidden=!on; if(on){ $('#aiSettings').scrollIntoView({behavior:'smooth',block:'start'}); $('#aiKey').focus(); } }
-  async function ask(tool, system, query, say, btn){
+  async function ask(tool, system, query, say, btn, effort='low', uses=3){
     const key=store.get('aiKey','');
     if(!key){ showSettings(true); say('bad','Najpierw wklej klucz API w ustawieniach (przycisk ⚙ Ustawienia u góry).'); return null; }
     if(busy) return null; busy=true; btn.disabled=true;
@@ -1082,11 +1084,11 @@ Zasady:
     try{
       if(!Anthropic) Anthropic=(await import(SDK_URL)).default;
       const client=new Anthropic({apiKey:key, dangerouslyAllowBrowser:true});
-      const tools=[tool]; if($('#aiWeb').checked) tools.unshift({type:'web_search_20260209',name:'web_search',max_uses:3});
+      const tools=[tool]; if($('#aiWeb').checked) tools.unshift({type:'web_search_20260209',name:'web_search',max_uses:uses});
       const messages=[{role:'user',content:`Utwór: ${query}\nWywołaj ${tool.name} z wynikiem.`}];
       for(let turn=0; turn<4; turn++){
         const res=await client.beta.messages.create({model:'claude-opus-5-5', max_tokens:16000, system, tools, tool_choice:{type:'auto'},
-          output_config:{effort:'low'}, betas:['server-side-fallback-2026-07-01'], fallbacks:'default', messages});
+          output_config:{effort}, betas:['server-side-fallback-2026-07-01'], fallbacks:'default', messages});
         if(res.stop_reason==='refusal') throw new Error('Model odmówił odpowiedzi na to zapytanie.');
         const tu=res.content.find(b=>b.type==='tool_use'&&b.name===tool.name);
         if(tu) return tu.input;
@@ -1102,8 +1104,8 @@ Zasady:
   }
   const CONF={wysoka:'pewne',srednia:'raczej pewne',niska:'niepewne, sprawdź ze słuchu'};
   async function findMelody(query){
-    const input=await ask(MTOOL, MSYSTEM, query, mfb, $('#aimGo')); if(!input) return;
-    if(!input.found){ mfb('bad',`Nie znam melodii „${query}”. Sprawdź pisownię albo dopisz wykonawcę.`); return; }
+    const input=await ask(MTOOL, MSYSTEM, query, mfb, $('#aimGo'), 'medium', 5); if(!input) return;
+    if(!input.found){ mfb('bad',`Nie znalazłem melodii „${query}”. ${input.tips||'Sprawdź pisownię albo dopisz wykonawcę.'}`); return; }
     const text=input.sections.map(s=>s.bars.map(b=>b.trim()).filter(Boolean).join(' | ')).filter(Boolean).join(' | ');
     const p=parseMelody(text);
     if(!p.notes.length){ mfb('bad','Odpowiedź nie zawierała dźwięków, które umiem odczytać. Spróbuj jeszcze raz.'); return; }
