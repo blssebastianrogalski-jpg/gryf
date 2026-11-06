@@ -1,5 +1,5 @@
 // Offline cache for Gryf. Bump VERSION when files change.
-const VERSION = 'gryf-v1';
+const VERSION = 'gryf-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './vendor/anthropic-sdk-1.0.0.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

@@ -183,6 +183,7 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
       <div class="meter" aria-hidden="true"><i id="meter"></i></div>
       <button class="btn primary small" id="micBtn">Włącz mikrofon</button>
     </div>
+    <button class="btn small" id="aiSetBtn" type="button" aria-label="Ustawienia">⚙ Ustawienia</button>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -193,6 +194,15 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
     <button role="tab" data-view="tuner" aria-selected="false">Stroik</button>
   </nav>
 
+  <section class="panel stack" id="aiSettings" hidden style="margin-bottom:18px">
+    <div class="row" style="justify-content:space-between"><h2 style="font-size:20px">Ustawienia wyszukiwania utworów</h2><button class="btn small" id="aiSetClose" type="button">Zamknij</button></div>
+    <div class="stack">
+            <div class="field"><span class="label">Klucz API Anthropic</span><input type="password" id="aiKey" placeholder="sk-ant-..." autocomplete="off"></div>
+            <label class="check"><input type="checkbox" id="aiWeb" checked><span>Sprawdzaj w internecie (dokładniej, ok. 50 gr – 1 zł za piosenkę)</span></label>
+            <p class="hint">Klucz zapisuje się tylko w tej przeglądarce. Utwórz go na console.anthropic.com (API Keys) i ustaw tam miesięczny limit wydatków. Bez sprawdzania w internecie wyszukanie kosztuje ok. 5–15 gr, ale przy mniej znanych utworach częściej się myli. Znalezione piosenki zapisują się na liście, więc za każdą płacisz raz.</p>
+            <div class="row"><button class="btn small" id="aiKeySave" type="button">Zapisz klucz</button><button class="btn small danger" id="aiKeyDel" type="button">Usuń klucz</button><span class="hint" id="aiKeyMsg"></span></div>
+          </div>
+  </section>
   <p class="notice" id="micNotice">Włącz mikrofon (przycisk u góry), żeby aplikacja słyszała gitarę. Najlepiej działa w cichym pokoju, z telefonem lub laptopem ok. pół metra od gitary.</p>
 
   <!-- MELODY -->
@@ -231,8 +241,14 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
         <div id="mHarmOut" class="stack" hidden></div>
       </div>
       <div class="panel stack">
+        <div class="label">Znajdź melodię dowolnego utworu</div>
+        <form class="row" id="aimForm" style="flex-wrap:nowrap">
+          <input type="text" id="aimQuery" placeholder="np. Mniej niż zero, Lady Pank" autocomplete="off">
+          <button class="btn primary" id="aimGo" type="submit">Znajdź</button>
+        </form>
+        <div class="fb" id="aimFb" hidden><span class="dot"></span><span id="aimFbText"></span></div>
         <div class="label">Melodie</div>
-        <input type="search" id="mSearch" placeholder="Szukaj po tytule lub wykonawcy">
+        <input type="search" id="mSearch" placeholder="Szukaj na liście po tytule lub wykonawcy">
         <div class="list" id="mList"></div>
         <details>
           <summary>Dodaj własną melodię</summary>
@@ -332,15 +348,6 @@ footer{margin-top:28px;color:var(--muted);font-size:13px}
           <button class="btn primary" id="aiGo" type="submit">Znajdź</button>
         </form>
         <div class="fb" id="aiFb" hidden><span class="dot"></span><span id="aiFbText"></span></div>
-        <details id="aiSettings">
-          <summary>Ustawienia wyszukiwania (klucz API)</summary>
-          <div class="stack" style="margin-top:10px">
-            <div class="field"><span class="label">Klucz API Anthropic</span><input type="password" id="aiKey" placeholder="sk-ant-..." autocomplete="off"></div>
-            <label class="check"><input type="checkbox" id="aiWeb" checked><span>Sprawdzaj w internecie (dokładniej, ok. 50 gr – 1 zł za piosenkę)</span></label>
-            <p class="hint">Klucz zapisuje się tylko w tej przeglądarce. Utwórz go na console.anthropic.com (API Keys) i ustaw tam miesięczny limit wydatków. Bez sprawdzania w internecie wyszukanie kosztuje ok. 5–15 gr, ale przy mniej znanych utworach częściej się myli. Znalezione piosenki zapisują się na liście, więc za każdą płacisz raz.</p>
-            <div class="row"><button class="btn small" id="aiKeySave" type="button">Zapisz klucz</button><button class="btn small danger" id="aiKeyDel" type="button">Usuń klucz</button><span class="hint" id="aiKeyMsg"></span></div>
-          </div>
-        </details>
         <div class="label">Piosenki</div>
         <input type="search" id="sSearch" placeholder="Szukaj na liście po tytule lub wykonawcy">
         <div class="list" id="sList"></div>
@@ -799,10 +806,10 @@ VIEWS.melody = (()=>{
     const q=$('#mSearch').value.trim().toLowerCase(); const box=$('#mList'); box.innerHTML='';
     all().filter(m=>!q||(m.title+' '+m.artist).toLowerCase().includes(q)).forEach(m=>{
       const own=!MELODIES.includes(m);
-      const b=el('button',{class:'item'+(sel&&sel.id===m.id?' on':''),onclick:()=>select(m)}, el('div',{}, el('div',{class:'t'},m.title), el('div',{class:'a'},m.artist||'')), el('span',{class:'tag'}, own?'moja':'wbudowana'));
+      const b=el('button',{class:'item'+(sel&&sel.id===m.id?' on':''),onclick:()=>select(m)}, el('div',{}, el('div',{class:'t'},m.title), el('div',{class:'a'},m.artist||'')), el('span',{class:'tag'}, m.ai?'AI':own?'moja':'wbudowana'));
       box.append(b);
     });
-    if(!box.children.length) box.append(el('p',{class:'hint'},'Nie ma takiej melodii. Dodaj ją poniżej albo nagraj w zakładce „Nagraj i dobierz akordy”.'));
+    if(!box.children.length) box.append(el('p',{class:'hint'},'Nie ma jej jeszcze na liście. Wpisz tytuł w „Znajdź melodię” powyżej albo dodaj ją ręcznie poniżej.'));
   }
   function select(m){ sel=m; $('#mDel').hidden=MELODIES.includes(m); notes=parseMelody(m.text).notes; chordAt=null; $('#mHarmOut').hidden=true; $('#mTitle').textContent=m.title; store.set('lastMelody',m.id); reset(); renderList(); }
   function reset(){ idx=0; status=notes.map(()=>null); errs=0; firstOk=0; missedHere=false; needOnset=false; done=false; draw(); fb('', 'Zagraj pierwszy dźwięk, gdy będziesz gotowy.'); }
@@ -1037,48 +1044,92 @@ Zasady:
 - Jeden akord to jeden takt. Gdy akord trwa dwa takty, powtórz go.
 - Gdy nie jesteś pewien akordów, ustaw confidence na niska i napisz to w tips. Gdy nie znasz utworu, ustaw found=false.
 - Wskazówki pisz po polsku, krótko i życzliwie.`;
-  function fb(kind,text){ const f=$('#aiFb'); f.hidden=false; f.className='fb'+(kind?' '+kind:''); $('#aiFbText').textContent=text; }
-  async function find(query){
+  const MTOOL={
+    name:'pokaz_melodie',
+    description:'Zwraca melodię utworu jako tabulaturę (struna/próg) do ćwiczenia w aplikacji. Wywołaj dokładnie raz, na końcu.',
+    strict:true,
+    input_schema:{type:'object',additionalProperties:false,
+      required:['found','title','artist','part','bpm','confidence','tips','sections'],
+      properties:{
+        found:{type:'boolean',description:'false, jeśli nie rozpoznajesz utworu albo nie znasz jego melodii'},
+        title:{type:'string'}, artist:{type:'string'},
+        part:{type:'string',description:'który fragment zapisano, np. "riff ze wstępu i refren"'},
+        bpm:{type:'integer'},
+        confidence:{type:'string',enum:['wysoka','srednia','niska']},
+        tips:{type:'string',description:'1-3 krótkie wskazówki po polsku dla 13-latka'},
+        sections:{type:'array',items:{type:'object',additionalProperties:false,required:['name','bars'],
+          properties:{name:{type:'string',description:'np. Riff, Zwrotka, Refren'},
+            bars:{type:'array',items:{type:'string'},description:'jeden takt: pojedyncze dźwięki po kolei jako struna/próg oddzielone spacjami, np. "1/0 1/3 2/1 2/3". Struna 1 = najcieńsza e, 6 = najgrubsza E.'}}}}
+      }}
+  };
+  const MSYSTEM=`Jesteś nauczycielem gitary w aplikacji dla 13-latka, który zaczyna grać na gitarze klasycznej i lubi grać melodie znanych piosenek.
+Użytkownik podaje tytuł i wykonawcę. Zapisz najbardziej rozpoznawalną melodię utworu (linię wokalu z refrenu albo słynny riff) jako tabulaturę i przekaż ją narzędziem pokaz_melodie.
+Zasady:
+- Tylko pojedyncze dźwięki po kolei, bez akordów. Każdy dźwięk jako struna/próg, np. 2/1. Struna 1 to najcieńsza (e), struna 6 najgrubsza (E). Strój standardowy.
+- Graj możliwie w pierwszej pozycji (progi 0-5), żeby było łatwo. Możesz przenieść melodię o oktawę lub do łatwiejszej tonacji.
+- Zapisz 4 do 16 taktów, najpierw najbardziej znany fragment.
+- Nie cytuj tekstu piosenki.
+- Gdy nie jesteś pewien dźwięków, ustaw confidence na niska i napisz to w tips. Gdy nie znasz melodii, ustaw found=false.
+- Wskazówki pisz po polsku, krótko i życzliwie.`;
+  function mkfb(id){ return (kind,text)=>{ const f=$('#'+id); f.hidden=false; f.className='fb'+(kind?' '+kind:''); $('#'+id+'Text').textContent=text; }; }
+  const fb=mkfb('aiFb'), mfb=mkfb('aimFb');
+  function showSettings(on=true){ $('#aiSettings').hidden=!on; if(on){ $('#aiSettings').scrollIntoView({behavior:'smooth',block:'start'}); $('#aiKey').focus(); } }
+  async function ask(tool, system, query, say, btn){
     const key=store.get('aiKey','');
-    if(!key){ $('#aiSettings').open=true; fb('bad','Najpierw wklej klucz API w ustawieniach poniżej.'); return; }
-    if(busy) return; busy=true; $('#aiGo').disabled=true;
-    fb('', $('#aiWeb').checked? 'Szukam chwytów w internecie… to potrwa do minuty.' : 'Szukam chwytów…');
+    if(!key){ showSettings(true); say('bad','Najpierw wklej klucz API w ustawieniach (przycisk ⚙ Ustawienia u góry).'); return null; }
+    if(busy) return null; busy=true; btn.disabled=true;
+    say('', $('#aiWeb').checked? 'Szukam w internecie… to potrwa do minuty.' : 'Szukam…');
     try{
       if(!Anthropic) Anthropic=(await import(SDK_URL)).default;
       const client=new Anthropic({apiKey:key, dangerouslyAllowBrowser:true});
-      const tools=[TOOL]; if($('#aiWeb').checked) tools.unshift({type:'web_search_20260209',name:'web_search',max_uses:3});
-      const messages=[{role:'user',content:`Utwór: ${query}\nZnajdź akordy i wywołaj pokaz_chwyty.`}];
-      let res, input=null;
-      for(let turn=0; turn<4 && !input; turn++){
-        res=await client.beta.messages.create({model:'claude-opus-5-5', max_tokens:16000, system:SYSTEM, tools, tool_choice:{type:'auto'},
+      const tools=[tool]; if($('#aiWeb').checked) tools.unshift({type:'web_search_20260209',name:'web_search',max_uses:3});
+      const messages=[{role:'user',content:`Utwór: ${query}\nWywołaj ${tool.name} z wynikiem.`}];
+      for(let turn=0; turn<4; turn++){
+        const res=await client.beta.messages.create({model:'claude-opus-5-5', max_tokens:16000, system, tools, tool_choice:{type:'auto'},
           output_config:{effort:'low'}, betas:['server-side-fallback-2026-07-01'], fallbacks:'default', messages});
-        if(res.stop_reason==='refusal'){ throw new Error('Model odmówił odpowiedzi na to zapytanie.'); }
-        const tu=res.content.find(b=>b.type==='tool_use'&&b.name==='pokaz_chwyty');
-        if(tu){ input=tu.input; break; }
+        if(res.stop_reason==='refusal') throw new Error('Model odmówił odpowiedzi na to zapytanie.');
+        const tu=res.content.find(b=>b.type==='tool_use'&&b.name===tool.name);
+        if(tu) return tu.input;
         if(res.stop_reason==='pause_turn'){ messages.push({role:'assistant',content:res.content}); continue; }
-        messages.push({role:'assistant',content:res.content},{role:'user',content:'Wywołaj teraz pokaz_chwyty z wynikiem.'});
+        messages.push({role:'assistant',content:res.content},{role:'user',content:`Wywołaj teraz ${tool.name} z wynikiem.`});
       }
-      if(!input) throw new Error('Nie dostałem chwytów. Spróbuj jeszcze raz albo dopisz wykonawcę.');
-      if(!input.found){ fb('bad',`Nie znam utworu „${query}”. Sprawdź pisownię albo wklej chwyty ręcznie poniżej.`); return; }
-      const lines=[];
-      input.sections.forEach(s=>s.lines.forEach((l,i)=>{ lines.push(l.trim()); lines.push(i===0?`(${s.name})`:''); }));
-      const text=lines.join('\n');
-      const steps=parseSong(text);
-      if(!steps.length) throw new Error('Odpowiedź nie zawierała akordów, które umiem odczytać.');
-      const conf={wysoka:'pewne',srednia:'raczej pewne',niska:'niepewne, sprawdź ze słuchu'}[input.confidence];
-      const song={id:'ai'+Date.now(), title:input.title||query, artist:(input.artist||'')+(input.capo?` · kapodaster na ${input.capo}. progu`:''), text, pat: PATTERNS[input.strum]?input.strum:(input.meter==='3/4'?'waltz':'basic'), bpm:Math.max(40,Math.min(160,input.bpm||80)), ai:true, tips:input.tips, conf};
-      const own=store.get('songs',[]); own.push(song); store.set('songs',own);
-      SONGS.selectSong(song);
-      fb(input.confidence==='niska'?'bad':'ok', `Gotowe: ${song.title}. Tonacja ${input.key}${input.capo?`, kapodaster na ${input.capo}. progu`:''}. Akordy: ${[...new Set(steps.map(s=>s.name))].join(', ')} (${conf}). ${input.tips||''}`);
+      throw new Error('Nie dostałem odpowiedzi. Spróbuj jeszcze raz albo dopisz wykonawcę.');
     }catch(e){
       const st=e && e.status;
-      const msg = st===401? 'Klucz API jest nieprawidłowy. Sprawdź go w ustawieniach.' : st===429? 'Za dużo zapytań naraz albo wyczerpany limit. Spróbuj za chwilę.' : st===400 && /credit|balance/i.test(e.message||'')? 'Brak środków na koncie API. Doładuj je na console.anthropic.com.' : (e&&e.message&&!st)? e.message : 'Nie udało się połączyć z usługą. Sprawdź internet i spróbuj ponownie.';
-      fb('bad',msg);
-    }finally{ busy=false; $('#aiGo').disabled=false; }
+      say('bad', st===401? 'Klucz API jest nieprawidłowy. Sprawdź go w ustawieniach.' : st===429? 'Za dużo zapytań naraz albo wyczerpany limit. Spróbuj za chwilę.' : st===400 && /credit|balance/i.test(e.message||'')? 'Brak środków na koncie API. Doładuj je na console.anthropic.com.' : (e&&e.message&&!st)? e.message : 'Nie udało się połączyć z usługą. Sprawdź internet i spróbuj ponownie.');
+      return null;
+    }finally{ busy=false; btn.disabled=false; }
+  }
+  const CONF={wysoka:'pewne',srednia:'raczej pewne',niska:'niepewne, sprawdź ze słuchu'};
+  async function findMelody(query){
+    const input=await ask(MTOOL, MSYSTEM, query, mfb, $('#aimGo')); if(!input) return;
+    if(!input.found){ mfb('bad',`Nie znam melodii „${query}”. Sprawdź pisownię albo dopisz wykonawcę.`); return; }
+    const text=input.sections.map(s=>s.bars.map(b=>b.trim()).filter(Boolean).join(' | ')).filter(Boolean).join(' | ');
+    const p=parseMelody(text);
+    if(!p.notes.length){ mfb('bad','Odpowiedź nie zawierała dźwięków, które umiem odczytać. Spróbuj jeszcze raz.'); return; }
+    const m={id:'ai'+Date.now(), title:input.title||query, artist:input.artist||'', text, ai:true};
+    const own=store.get('melodies',[]); own.push(m); store.set('melodies',own);
+    VIEWS.melody.select(m);
+    mfb(input.confidence==='niska'?'bad':'ok', `Gotowe: ${m.title} (${input.part}). ${p.notes.length} dźwięków, ${CONF[input.confidence]}. ${input.tips||''}`);
+  }
+  async function find(query){
+    const input=await ask(TOOL, SYSTEM, query, fb, $('#aiGo')); if(!input) return;
+    if(!input.found){ fb('bad',`Nie znam utworu „${query}”. Sprawdź pisownię albo wklej chwyty ręcznie poniżej.`); return; }
+    const lines=[];
+    input.sections.forEach(s=>s.lines.forEach((l,i)=>{ lines.push(l.trim()); lines.push(i===0?`(${s.name})`:''); }));
+    const text=lines.join('\n'); const steps=parseSong(text);
+    if(!steps.length){ fb('bad','Odpowiedź nie zawierała akordów, które umiem odczytać.'); return; }
+    const song={id:'ai'+Date.now(), title:input.title||query, artist:(input.artist||'')+(input.capo?` · kapodaster na ${input.capo}. progu`:''), text, pat: PATTERNS[input.strum]?input.strum:(input.meter==='3/4'?'waltz':'basic'), bpm:Math.max(40,Math.min(160,input.bpm||80)), ai:true, tips:input.tips, conf:CONF[input.confidence]};
+    const own=store.get('songs',[]); own.push(song); store.set('songs',own);
+    SONGS.selectSong(song);
+    fb(input.confidence==='niska'?'bad':'ok', `Gotowe: ${song.title}. Tonacja ${input.key}${input.capo?`, kapodaster na ${input.capo}. progu`:''}. Akordy: ${[...new Set(steps.map(s=>s.name))].join(', ')} (${song.conf}). ${input.tips||''}`);
   }
   function init(){
     $('#aiKey').value=store.get('aiKey','');
     $('#aiForm').addEventListener('submit',e=>{ e.preventDefault(); const q=$('#aiQuery').value.trim(); if(q) find(q); });
+    $('#aimForm').addEventListener('submit',e=>{ e.preventDefault(); const q=$('#aimQuery').value.trim(); if(q) findMelody(q); });
+    $('#aiSetBtn').onclick=()=>showSettings($('#aiSettings').hidden);
+    $('#aiSetClose').onclick=()=>showSettings(false);
     $('#aiKeySave').onclick=()=>{ const k=$('#aiKey').value.trim(); store.set('aiKey',k); $('#aiKeyMsg').textContent=k?'Zapisano.':'Wpisz klucz.'; };
     $('#aiKeyDel').onclick=()=>{ store.set('aiKey',''); $('#aiKey').value=''; $('#aiKeyMsg').textContent='Usunięto.'; };
   }
